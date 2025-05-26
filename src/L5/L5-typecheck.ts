@@ -5,7 +5,7 @@ import { isAppExp, isBoolExp, isDefineExp, isIfExp, isLetrecExp, isLetExp, isNum
          isPrimOp, isProcExp, isProgram, isStrExp, isVarRef, parseL5Exp, unparse,
          AppExp, BoolExp, DefineExp, Exp, IfExp, LetrecExp, LetExp, NumExp,
          Parsed, PrimOp, ProcExp, Program, StrExp } from "./L5-ast";
-import { applyTEnv, makeEmptyTEnv, makeExtendTEnv, TEnv } from "./TEnv";
+import { applyTEnv, makeEmptyTEnv, makeExtendTEnv, TEnv} from "./TEnv";
 import { isProcTExp, makeBoolTExp, makeNumTExp, makeProcTExp, makeStrTExp, makeVoidTExp,
          parseTE, unparseTExp,
          BoolTExp, NumTExp, StrTExp, TExp, VoidTExp } from "./TExp";
@@ -211,14 +211,44 @@ export const typeofLetrec = (exp: LetrecExp, tenv: TEnv): Result<TExp> => {
 // Purpose: compute the type of a define
 // Typing rule:
 //   (define (var : texp) val)
-// TODO - write the true definition
+
+// Part 2, Question 2.1
 export const typeofDefine = (exp: DefineExp, tenv: TEnv): Result<VoidTExp> => {
-    // return Error("TODO");
-    return makeOk(makeVoidTExp());
+    return bind(typeofExp(exp.val, tenv), (valType: TExp) =>
+        bind(checkEqualType(exp.var.texp, valType, exp),
+            _ => makeOk(makeVoidTExp())));
 };
 
 // Purpose: compute the type of a program
 // Typing rule:
-// TODO - write the true definition
-export const typeofProgram = (exp: Program, tenv: TEnv): Result<TExp> =>
-    makeFailure("TODO");
+
+// Part 2, Question 2.2
+export const typeofProgram = (program: Program, tenv: TEnv): Result<TExp> => {
+    let currentTenv = tenv;
+    let lastResult: Result<TExp> = makeFailure("No expressions in program");
+
+    for (const exp of program.exps) {
+        if (isDefineExp(exp)) {
+            // Get the type of the value
+            const valTypeResult = typeofExp(exp.val, currentTenv);
+            if (valTypeResult.tag === "Failure") return valTypeResult;
+
+            // Check declared type matches actual type
+            const eqCheck = checkEqualType(exp.var.texp, valTypeResult.value, exp);
+            if (eqCheck.tag === "Failure") return eqCheck;
+
+            // Extend the environment with the new variable binding
+            currentTenv = extendTEnv(exp.var.var, exp.var.texp, currentTenv);
+        } else {
+            // Type check normal expression
+            lastResult = typeofExp(exp, currentTenv);
+            if (lastResult.tag === "Failure") return lastResult;
+        }
+    }
+
+    return lastResult;
+};
+
+const extendTEnv = (v: string, te: TExp, tenv: TEnv): TEnv =>
+    makeExtendTEnv([v], [te], tenv);
+
