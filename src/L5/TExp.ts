@@ -39,8 +39,8 @@ import { Result, bind, makeOk, makeFailure, mapResult, mapv } from "../shared/re
 import { parse as p } from "../shared/parser";
 import { format } from "../shared/format";
 
-export type TExp =  AtomicTExp | CompoundTExp | TVar | PairTExp; //ADDED PairTExp, part 3
-export const isTExp = (x: any): x is TExp => isAtomicTExp(x) || isCompoundTExp(x) || isTVar(x);
+export type TExp =  AtomicTExp | CompoundTExp | TVar | PairTExp | LiteralTExp; //ADDED PairTExp, part 3
+export const isTExp = (x: any): x is TExp => isAtomicTExp(x) || isCompoundTExp(x) || isTVar(x) || isPairTExp(x) || isLiteralTExp(x);
 
 export type AtomicTExp = NumTExp | BoolTExp | StrTExp | VoidTExp;
 export const isAtomicTExp = (x: any): x is AtomicTExp =>
@@ -131,6 +131,11 @@ export const makePairTExp = (left: TExp, right: TExp): PairTExp =>
     ({ tag: "PairTExp", left, right });
 export const isPairTExp = (te: any): te is PairTExp =>
     te.tag === "PairTExp";
+
+export type LiteralTExp = { tag: "LiteralTExp" };
+export const makeLiteralTExp = (): LiteralTExp => ({ tag: "LiteralTExp" });
+export const isLiteralTExp = (x: any): x is LiteralTExp =>
+  x.tag === "LiteralTExp";
 
 
 // ========================================================
@@ -229,6 +234,8 @@ export const unparseTExp = (te: TExp): Result<string> => {
             isVoidTExp(x) ? makeOk('void') :
             isEmptyTVar(x) ? makeOk(x.var) :
             isTVar(x) ? up(tvarContents(x)) :
+            //ADDED LiteralTExp
+            isLiteralTExp(x) ? makeOk('literal') :
             //ADDED PairTExp, part 3
             isPairTExp(x) ? bind(unparseTExp(x.left), (left: string) =>
                                 mapv(unparseTExp(x.right), (right: string) =>

@@ -155,9 +155,9 @@ export const makeSetExp = (v: VarRef, val: CExp): SetExp =>
 export const isSetExp = (x: any): x is SetExp => x.tag === "SetExp";
 
 // To help parser - define a type for reserved key words.
-export type SpecialFormKeyword = "lambda" | "let" | "letrec" | "if" | "set!" | "quote";
+export type SpecialFormKeyword = "lambda" | "let" | "letrec" | "if" | "set!" | "quote" | "'"; //ADDED '
 const isSpecialFormKeyword = (x: string): x is SpecialFormKeyword =>
-    ["if", "lambda", "let", "quote", "letrec", "set!"].includes(x);
+    ["if", "lambda", "let", "quote", "letrec", "set!", "'"].includes(x);
 
 /*
     ;; <prim-op>  ::= + | - | * | / | < | > | = | not | and | or | eq? | string=?
@@ -205,7 +205,7 @@ export const parseL5SpecialForm = (op: SpecialFormKeyword, params: Sexp[]): Resu
         op === "if" ? parseIfExp(params) :
         op === "lambda" ? parseProcExp(first(params), rest(params)) :
         op === "let" ? parseLetExp(first(params), rest(params)) :
-        op === "quote" ? parseLitExp(first(params)) :
+        (op === "quote" || op === "'") ? parseLitExp(first(params)) : // ADDED "'"
         op === "letrec" ? parseLetrecExp(first(params), rest(params)) :
         op === "set!" ? parseSetExp(params) :
         makeFailure(`Unknown special form: ${op}`) :
