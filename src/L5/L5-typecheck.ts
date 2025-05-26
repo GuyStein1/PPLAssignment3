@@ -4,15 +4,16 @@ import { equals, map, zipWith } from 'ramda';
 import { isAppExp, isBoolExp, isDefineExp, isIfExp, isLetrecExp, isLetExp, isNumExp,
          isPrimOp, isProcExp, isProgram, isStrExp, isVarRef, parseL5Exp, unparse,
          AppExp, BoolExp, DefineExp, Exp, IfExp, LetrecExp, LetExp, NumExp,
-         Parsed, PrimOp, ProcExp, Program, StrExp, parseL5 } from "./L5-ast";
+         Parsed, PrimOp, ProcExp, Program, StrExp, parseL5, isLitExp, LitExp, makeLitExp } from "./L5-ast";
 import { applyTEnv, makeEmptyTEnv, makeExtendTEnv, TEnv} from "./TEnv";
 import { isProcTExp, makeBoolTExp, makeNumTExp, makeProcTExp, makeStrTExp, makeVoidTExp,
          parseTE, unparseTExp,
-         BoolTExp, NumTExp, StrTExp, TExp, VoidTExp } from "./TExp";
+         BoolTExp, NumTExp, StrTExp, TExp, VoidTExp, makeFreshTVar, makePairTExp } from "./TExp";
 import { isEmpty, allT, first, rest, NonEmptyList, List, isNonEmptyList } from '../shared/list';
 import { Result, makeFailure, bind, makeOk, zipWithResult } from '../shared/result';
 import { parse as p } from "../shared/parser";
 import { format } from '../shared/format';
+import { isCompoundSExp, isEmptySExp } from './L5-value';
 
 // Purpose: Check that type expressions are equivalent
 // as part of a fully-annotated type check process of exp.
@@ -52,8 +53,34 @@ export const typeofExp = (exp: Parsed, tenv: TEnv): Result<TExp> =>
     isLetrecExp(exp) ? typeofLetrec(exp, tenv) :
     isDefineExp(exp) ? typeofDefine(exp, tenv) :
     isProgram(exp) ? typeofProgram(exp, tenv) :
+    //ADDED
+    isLitExp(exp) ? typeofLit(exp) :
     // TODO: isSetExp(exp) isLitExp(exp)
     makeFailure(`Unknown type: ${format(exp)}`);
+
+// ADDED 
+const typeofLit = (exp: LitExp): Result<TExp> => {
+    const val = exp.val;
+
+    // For booleans
+    if (typeof val === "boolean") return makeOk(makeBoolTExp());
+    // For numbers
+    if (typeof val === "number") return makeOk(makeNumTExp());
+    // For strings or symbols (quoted identifiers)
+    if (typeof val === "string") return makeOk(makeStrTExp());
+
+    // For compound pairs like (4 . 5)
+    if (isCompoundSExp(val)) {
+        return bind(typeofLit(makeLitExp(val.val1)), (t1: TExp) =>
+            bind(typeofLit(makeLitExp(val.val2)), (t2: TExp) =>
+                makeOk(makePairTExp(t1, t2))));
+    }
+
+    // For empty list
+    if (isEmptySExp(val)) return makeOk(makeVoidTExp());
+
+    return makeFailure(`Unknown literal type: ${JSON.stringify(val)}`);
+};
 
 // Purpose: Compute the type of a sequence of expressions
 // Check all the exps in a sequence - return type of last.
@@ -102,6 +129,19 @@ export const typeofPrim = (p: PrimOp): Result<TExp> =>
     (p.op === 'string=?') ? parseTE('(T1 * T2 -> boolean)') :
     (p.op === 'display') ? parseTE('(T -> void)') :
     (p.op === 'newline') ? parseTE('(Empty -> void)') :
+    // ADDED - Primitives
+    (p.op === 'cons') ? makeOk(makeProcTExp([makeFreshTVar(), makeFreshTVar()], makePairTExp(makeFreshTVar(), makeFreshTVar()))) :
+    (p.op === 'car')  ? (() => {
+        const t1 = makeFreshTVar();
+        const t2 = makeFreshTVar();
+        return makeOk(makeProcTExp([makePairTExp(t1, t2)], t1));
+    })() :
+    (p.op === 'cdr')  ? (() => {
+        const t1 = makeFreshTVar();
+        const t2 = makeFreshTVar();
+        return makeOk(makeProcTExp([makePairTExp(t1, t2)], t2));
+    })() :
+
     makeFailure(`Primitive not yet implemented: ${p.op}`);
 
 // Purpose: compute the type of an if-exp
