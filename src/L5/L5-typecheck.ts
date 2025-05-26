@@ -223,7 +223,6 @@ export const typeofDefine = (exp: DefineExp, tenv: TEnv): Result<VoidTExp> => {
 // Typing rule:
 
 // Part 2, Question 2.2
-
 export const L5programTypeof = (code: string): Result<string> =>
     bind(parseL5(code), (prog) =>
         bind(typeofProgram(prog, makeEmptyTEnv()), (te) =>

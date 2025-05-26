@@ -39,7 +39,7 @@ import { Result, bind, makeOk, makeFailure, mapResult, mapv } from "../shared/re
 import { parse as p } from "../shared/parser";
 import { format } from "../shared/format";
 
-export type TExp =  AtomicTExp | CompoundTExp | TVar;
+export type TExp =  AtomicTExp | CompoundTExp | TVar | PairTExp; //ADDED PairTExp, part 3
 export const isTExp = (x: any): x is TExp => isAtomicTExp(x) || isCompoundTExp(x) || isTVar(x);
 
 export type AtomicTExp = NumTExp | BoolTExp | StrTExp | VoidTExp;
@@ -105,6 +105,7 @@ const makeTVarGen = (): () => TVar => {
         return makeTVar(`T_${count}`);
     }
 }
+
 export const makeFreshTVar = makeTVarGen();
 export const isTVar = (x: any): x is TVar => x.tag === "TVar";
 export const eqTVar = (tv1: TVar, tv2: TVar): boolean => tv1.var === tv2.var;
@@ -122,6 +123,15 @@ export const tvarDeref = (te: TExp): TExp => {
     else
         return contents;
 }
+
+
+//ADDED PairTExp, part 3
+export type PairTExp = { tag: "PairTExp"; left: TExp; right: TExp; };
+export const makePairTExp = (left: TExp, right: TExp): PairTExp =>
+    ({ tag: "PairTExp", left, right });
+export const isPairTExp = (te: any): te is PairTExp =>
+    te.tag === "PairTExp";
+
 
 // ========================================================
 // TExp Utilities
@@ -163,7 +173,17 @@ export const parseTExp = (texp: Sexp): Result<TExp> =>
 ;; expected exactly one -> in the list
 ;; We do not accept (a -> b -> c) - must parenthesize
 */
-const parseCompoundTExp = (texps: Sexp[]): Result<ProcTExp> => {
+
+// Enchanced version to parse pairs
+const parseCompoundTExp = (texps: Sexp[]): Result<TExp> => {
+    // Handle Pair type
+    if (texps[0] === "Pair" && texps.length === 3) {
+        return bind(parseTExp(texps[1]), (left: TExp) =>
+            mapv(parseTExp(texps[2]), (right: TExp) =>
+                makePairTExp(left, right)));
+    }
+
+    // Handle Proc types
     const pos = texps.indexOf('->');
     return (pos === -1)  ? makeFailure(`Procedure type expression without -> - ${format(texps)}`) :
            (pos === 0) ? makeFailure(`No param types in proc texp - ${format(texps)}`) :
@@ -202,20 +222,24 @@ export const unparseTExp = (te: TExp): Result<string> => {
                 cons(paramTE, chain(te => ['*', te], paramTEs)))) :
         makeOk(["Empty"]);
 
-    const up = (x?: TExp): Result<string | string[]> =>
-        isNumTExp(x) ? makeOk('number') :
-        isBoolTExp(x) ? makeOk('boolean') :
-        isStrTExp(x) ? makeOk('string') :
-        isVoidTExp(x) ? makeOk('void') :
-        isEmptyTVar(x) ? makeOk(x.var) :
-        isTVar(x) ? up(tvarContents(x)) :
-        isProcTExp(x) ? bind(unparseTuple(x.paramTEs), (paramTEs: string[]) =>
-                            mapv(unparseTExp(x.returnTE), (returnTE: string) =>
-                                [...paramTEs, '->', returnTE])) :
-        isEmptyTupleTExp(x) ? makeOk("Empty") :
-        isNonEmptyTupleTExp(x) ? unparseTuple(x.TEs) :
-        x === undefined ? makeFailure("Undefined TVar") :
-        x;
+        const up = (x?: TExp): Result<string | string[]> =>
+            isNumTExp(x) ? makeOk('number') :
+            isBoolTExp(x) ? makeOk('boolean') :
+            isStrTExp(x) ? makeOk('string') :
+            isVoidTExp(x) ? makeOk('void') :
+            isEmptyTVar(x) ? makeOk(x.var) :
+            isTVar(x) ? up(tvarContents(x)) :
+            //ADDED PairTExp, part 3
+            isPairTExp(x) ? bind(unparseTExp(x.left), (left: string) =>
+                                mapv(unparseTExp(x.right), (right: string) =>
+                                    ['Pair', left, right])) :
+            isProcTExp(x) ? bind(unparseTuple(x.paramTEs), (paramTEs: string[]) =>
+                                mapv(unparseTExp(x.returnTE), (returnTE: string) =>
+                                    [...paramTEs, '->', returnTE])) :
+            isEmptyTupleTExp(x) ? makeOk("Empty") :
+            isNonEmptyTupleTExp(x) ? unparseTuple(x.TEs) :
+            x === undefined ? makeFailure("Undefined TVar") :
+            x;
 
     const unparsed = up(te);
     return mapv(unparsed,
