@@ -4,7 +4,7 @@ import { equals, map, zipWith } from 'ramda';
 import { isAppExp, isBoolExp, isDefineExp, isIfExp, isLetrecExp, isLetExp, isNumExp,
          isPrimOp, isProcExp, isProgram, isStrExp, isVarRef, parseL5Exp, unparse,
          AppExp, BoolExp, DefineExp, Exp, IfExp, LetrecExp, LetExp, NumExp,
-         Parsed, PrimOp, ProcExp, Program, StrExp } from "./L5-ast";
+         Parsed, PrimOp, ProcExp, Program, StrExp, parseL5 } from "./L5-ast";
 import { applyTEnv, makeEmptyTEnv, makeExtendTEnv, TEnv} from "./TEnv";
 import { isProcTExp, makeBoolTExp, makeNumTExp, makeProcTExp, makeStrTExp, makeVoidTExp,
          parseTE, unparseTExp,
@@ -223,6 +223,12 @@ export const typeofDefine = (exp: DefineExp, tenv: TEnv): Result<VoidTExp> => {
 // Typing rule:
 
 // Part 2, Question 2.2
+
+export const L5programTypeof = (code: string): Result<string> =>
+    bind(parseL5(code), (prog) =>
+        bind(typeofProgram(prog, makeEmptyTEnv()), (te) =>
+            unparseTExp(te))); 
+
 export const typeofProgram = (program: Program, tenv: TEnv): Result<TExp> => {
     let currentTenv = tenv;
     let lastResult: Result<TExp> = makeFailure("No expressions in program");
