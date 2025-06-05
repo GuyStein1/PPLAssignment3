@@ -171,9 +171,13 @@ describe("L5 Type Checker", () => {
         });
 
         it("should correctly type a quoted number and literal with shorthand notation", () => {
-            assert.deepEqual(getTypeofProgram("(L5 '(4 . 'abc))"), "(Pair number literal)");
+            assert.deepEqual(getTypeofProgram("(L5 '(4 . abc))"), "(Pair number literal)");
         });
 
+                
+        it("should correctly type a quoted number and literal with..", () => {
+            assert.deepEqual(getTypeofProgram("(L5 '(5 . (a . b)))"), "(Pair number (Pair literal literal))");
+        });
 
 
 

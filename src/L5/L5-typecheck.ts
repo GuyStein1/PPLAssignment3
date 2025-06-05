@@ -111,14 +111,8 @@ export const typeofExp = (exp: Parsed, tenv: TEnv): Result<TExp> =>
 
 // ADDED 
 export const typeofLit = (val: SExpValue, inPair = false): Result<TExp> =>
-    // Special case: handle quoted 'quote or (quote x) literal forms
-    (isCompoundSExp(val) &&
-     isSymbolSExp(val.val1) &&
-     val.val1.val === "quote")
-        ? makeOk(makeLiteralTExp())
-
     // Handle dotted pairs (a . b)
-    : isCompoundSExp(val)
+    isCompoundSExp(val)
         ? bind(typeofLit(val.val1, true), t1 =>
             bind(typeofLit(val.val2, true), t2 =>
                 makeOk(makePairTExp(t1, t2))))
